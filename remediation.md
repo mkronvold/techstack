@@ -1,6 +1,8 @@
 # Remediation backlog (existing apps)
 
-Gaps versus this baseline. Use for dedicated remediation sessions (e.g. a **revu** session, a **tavi** session, a **themes** publish session). Do not treat this file as runtime policy — standards live in the sibling docs.
+Gaps versus this baseline. **Execution briefs and session kickoffs live in [`apps.md`](./apps.md)** (merged former home/WTG app lists). This file keeps priority IDs and compliance snapshots.
+
+Do not treat this file as runtime policy — standards live in the sibling docs.
 
 ## Legend
 
@@ -59,22 +61,32 @@ Gaps versus this baseline. Use for dedicated remediation sessions (e.g. a **revu
 
 ---
 
+## Other apps (detail in [`apps.md`](./apps.md))
+
+| App | Pri theme | Notes |
+| --- | --- | --- |
+| `mkronvold-wtg/whiplash` | P0 structure | Workspace + contracts + tests + full ops baseline |
+| `mkronvold-wtg/kpeviz` | P1 browser ops | Keep plain DOM; Node 26, validation, WTG LCM/scan |
+| `mkronvold-wtg/content-viewer` | P2 tiny | Document exception; minimal CI/scan if deployed |
+
 ## Cross-cutting / promptlib
 
 | ID | Pri | Gap | Target |
 | --- | --- | --- | --- |
-| PL-1 | P1 | `~/.promptlib/techstack.md` is a monolith + home/wtg forks | **Done:** replaced with pointer + profile summary linking this repo |
-| PL-2 | P2 | `techstack-home.md` / `techstack-wtg.md` app comparison still valuable | **Done:** archived as pointers to this repo + remediation |
+| PL-1 | P1 | `~/.promptlib/techstack.md` is a monolith + home/wtg forks | **Done:** pointer + profile summary linking this repo |
+| PL-2 | P2 | `techstack-home.md` / `techstack-wtg.md` split | **Done:** merged → `~/.promptlib/techstack-apps.md` + repo [`apps.md`](./apps.md) |
 | PL-3 | P2 | `lcm.md` in promptlib is a stub | **Done:** redirects to this `lcm.md` |
 
 ---
 
 ## Suggested session order
 
-1. **themes** — publish package (unblocks RV-5, TV-5).
+1. **themes** — publish package (unblocks UI consumers).
 2. **tavi** — Artifactory + Xray + Lane B (WTG reference completion).
 3. **revu** — immutable pins + K8s + Trivy fail-closed (home reference gains required channel).
-4. **promptlib** — replace monolith with links to `mkronvold/techstack`.
+4. **whiplash** — workspace + contracts + baseline ops.
+5. **kpeviz** / **content-viewer** — browser tiny hardening.
+6. **promptlib** — keep entrypoints pointing here only.
 
 ## Compliance snapshot (at doc authoring)
 
