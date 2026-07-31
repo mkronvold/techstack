@@ -13,8 +13,7 @@ Use this repository when starting or remediate-standardizing an app so tooling, 
 | [`lcm.md`](./lcm.md) | Image refresh cadence, immutable release pins, optional home auto-update, workload impact and how to avoid churn |
 | [`scanning.md`](./scanning.md) | Dependabot lanes, Trivy, Xray, exception registries, Lane B digest automation |
 | [`repo-setup.md`](./repo-setup.md) | GitHub repository settings, branch protection, layout checklist |
-| [`apps.md`](./apps.md) | Per-app alignment instructions and session kickoffs (all apps; not split by home/WTG) |
-| [`remediation.md`](./remediation.md) | Priority gap tables; use with `apps.md` for execution |
+| [`remediation.md`](./remediation.md) | Per-app alignment, session kickoffs, priority IDs (all apps; not split by home/WTG) |
 
 ## Locked defaults (v1)
 
