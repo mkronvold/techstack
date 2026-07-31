@@ -63,9 +63,9 @@ Gaps versus this baseline. Use for dedicated remediation sessions (e.g. a **revu
 
 | ID | Pri | Gap | Target |
 | --- | --- | --- | --- |
-| PL-1 | P1 | `~/.promptlib/techstack.md` is a monolith + home/wtg forks | Replace with pointer to this repo; keep short local cheat-sheet only |
-| PL-2 | P2 | `techstack-home.md` / `techstack-wtg.md` app comparison still valuable | Move curated comparison into this repo or archive with link |
-| PL-3 | P2 | `lcm.md` in promptlib is a stub | Delete or redirect to this `lcm.md` |
+| PL-1 | P1 | `~/.promptlib/techstack.md` is a monolith + home/wtg forks | **Done:** replaced with pointer + profile summary linking this repo |
+| PL-2 | P2 | `techstack-home.md` / `techstack-wtg.md` app comparison still valuable | **Done:** archived as pointers to this repo + remediation |
+| PL-3 | P2 | `lcm.md` in promptlib is a stub | **Done:** redirects to this `lcm.md` |
 
 ---
 

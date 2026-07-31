@@ -12,16 +12,24 @@ Decision matrix for application shape and core tooling. Operational CI, scanning
 | If this is true | Then use this profile | Required shape |
 | --- | --- | --- |
 | One Node process, no browser product UI, no database, no second runtime | Tiny standalone app | Node ESM + TypeScript where warranted; one package; no workspace; Dockerfile only when deployed |
-| Visualizes local, generated, or static artifacts; no product API or persistent data | Static visualization/dashboard | Vite + TypeScript; plain DOM/CSS by default; narrow plain-Node sidecar only for ops; Nginx static deploy when deployed |
-| Browser product without a complex API/data domain | Interactive web app | React 19 + Vite + TypeScript; one package unless shared runtime code appears |
+| Browser UI only: no owned product API, no persistent shared data domain, no second deployable runtime | Browser app | Vite + TypeScript; one package unless shared runtime code appears; plain DOM/CSS by default; **React 19** when UI state, forms, routing, or non-trivial remote data justify it; optional narrow plain-Node sidecar for ops only; Nginx (or equivalent) static deploy when deployed |
 | Owns an API, relational data, shared contracts, a worker, or more than one deployable runtime | Product app | pnpm + Turbo workspace with `apps/web`, `apps/api`, optional `apps/worker`, and `packages/schemas` or `packages/contracts` |
+
+### Browser app UI choice (within the profile)
+
+| If this is true | Then use | Do not |
+| --- | --- | --- |
+| Mostly static or generated artifacts, light DOM, little client state | Vite + TypeScript + plain DOM/CSS | Add React “just in case” |
+| Application state, forms, multi-route UI, or non-trivial server data | React 19 + Vite + TypeScript | Stay on ad-hoc DOM once component complexity is real |
+| Styling for either path | `@mkronvold/themes` when the UI is a maintained product surface | Hand-forked theme copies |
 
 ## Ask only these questions
 
 | If the request does not answer this | Then ask | If yes | If no |
 | --- | --- | --- | --- |
-| Durable shared data | Does it persist relational product data or change shared state? | Product app + Postgres | Static visualization or interactive web app |
-| Server boundary | Does it need an API this app owns? | `apps/api` + Fastify (default) | Browser/static only |
+| Durable shared data | Does it persist relational product data or change shared state? | Product app + Postgres | Browser app (or tiny standalone) |
+| Server boundary | Does it need an API this app owns? | `apps/api` + Fastify (default) | Browser app only |
+| Browser UI complexity | Does the browser surface need app state, forms, routing, or non-trivial remote data? | Browser app + React 19 | Browser app + plain DOM/CSS |
 | Background work | Does it need jobs outside an HTTP request lifecycle? | `apps/worker` | No worker |
 | Trust boundary inputs | External API data, files, or client requests? | Zod boundary schemas | Internal TypeScript types may suffice |
 | Shared types across runtimes | Do web/API/worker share schemas? | `packages/schemas` or `packages/contracts` | Keep types local |
@@ -44,8 +52,8 @@ Decision matrix for application shape and core tooling. Operational CI, scanning
 | --- | --- | --- |
 | New or restructured multi-package app | Corepack-managed `pnpm@10.x` + Turbo | Commit lockfile; `pnpm install --frozen-lockfile` in CI and Docker |
 | Existing stable standalone npm app | Keep npm until a justified restructure | `npm ci`; declare Node and npm versions |
-| Browser UI with app state/forms/routing/server data | React 19 + Vite + TypeScript | React Router for multi-route; TanStack Query for non-trivial remote state |
-| Focused static visualization | Vite + TypeScript without React | Add React only when complexity justifies it |
+| Browser app with app state/forms/routing/server data | React 19 + Vite + TypeScript | React Router for multi-route; TanStack Query for non-trivial remote state |
+| Browser app that is mostly viz/static artifacts | Vite + TypeScript without React | Add React only when component/state complexity justifies it |
 | New API with ordinary HTTP modules | Fastify + TypeScript | Default backend |
 | Strong DI/modules/larger-team boundaries | NestJS on Fastify | Do not use Nest only for uniformity on a small API |
 | Existing Express API | Keep while extracting contracts/tests/boundaries | Migrate to Fastify only deliberately |
@@ -103,7 +111,7 @@ Until `@mkronvold/themes` is published non-private, treat that as a baseline blo
 
 | Step | If true | Then |
 | --- | --- | --- |
-| 1 | No API, no persistent data, no shared state | Static visualization/dashboard |
+| 1 | No API, no persistent data, no shared state, but has a browser UI | Browser app (plain DOM default; React if UI complexity warrants) |
 | 2 | API, relational data, shared contracts, or independent jobs | Product app |
 | 3 | Product app | pnpm + Turbo + React/Vite web + Fastify API + Zod schemas + Postgres/Prisma + `@mkronvold/themes` |
 | 4 | Explicitly SQL-centric narrow data | Replace Prisma with `pg`; keep Postgres + Zod |
