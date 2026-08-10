@@ -54,7 +54,10 @@ kubectl rollout status deployment/<app>-api -n <ns>
 
 ## Optional channel: home / operator mutable auto-refresh
 
-Trusted self-hosted Docker Compose instances **may** track a mutable app tag (usually `latest`) and self-update. This is **optional** and must not replace immutable pins for cluster or reviewed multi-env paths.
+Trusted self-hosted Docker Compose instances **may** track an explicitly
+allowlisted mutable app tag (for example `dev`) and self-update. This is
+**optional** and must not replace immutable pins for cluster or reviewed
+multi-env paths; `latest` is never the default.
 
 ### When to enable
 
@@ -93,7 +96,7 @@ or application code at update time.
 
 | Contract | Acceptance criterion |
 | --- | --- |
-| Required configuration | Working directory, Compose files, Compose env files, explicit service-to-image allowlist, registry profile, target platform, app `up.sh`/health/rollback commands, lock path, digest record path, and rollback image prefix are set and validated before Docker is called |
+| Required configuration | Working directory, Compose files, Compose env files, explicit service-to-image allowlist, registry profile, target platform, app `up.sh`/health/rollback commands, lock path, digest record path, and rollback image prefix are set and validated before Docker is called; `ghcr-dev` also requires an explicit mutable-tag setting |
 | Safety scope | The rendered Compose image for every allowed service matches its allowlist entry; only those services are passed to `docker compose pull` and app commands; DBs, proxies, migration jobs, caches, and sidecars are never listed or operated |
 | Remote comparison | The running image's registry manifest digest is compared to the remote tag digest; Docker resolves the configured target platform, while the Artifactory profile independently verifies its Linux/amd64 child manifest; registry/auth/manifest errors and missing digests fail closed |
 | Modes and locking | `--once`, `--dry-run`, and optional interval operation exist; `flock -n` rejects a concurrent run; a confirmed no-op is logged and exits `10` |
@@ -111,8 +114,9 @@ services from the local tags restored by the updater.
 
 The updater is for an explicitly enabled mutable development/home candidate
 tag; it cannot rewrite, consume, or replace immutable `tag@sha256:digest`
-release pins. `ghcr-dev` accepts only
-`ghcr.io/<namespace>/<image>:latest`. `artifactory-repo-ops` accepts only
+release pins. `ghcr-dev` accepts only the app-configured
+`ghcr.io/<namespace>/<image>:<mutable-tag>` (including `latest` only when
+explicitly configured). `artifactory-repo-ops` accepts only
 `repo.ops` runtime image references and requires a protected
 source-to-pull digest mapping, `linux/amd64`, and matching
 `org.opencontainers.image.revision`; `sv4.art` is publication provenance,

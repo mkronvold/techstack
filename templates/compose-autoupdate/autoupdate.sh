@@ -137,10 +137,14 @@ validate_profile_images() {
   case "$AUTOUPDATE_REGISTRY_PROFILE" in
     ghcr-dev)
       [[ "$AUTOUPDATE_TARGET_PLATFORM" == linux/* ]] || die "ghcr-dev requires a linux target platform"
+      [[ -n "${AUTOUPDATE_GHCR_MUTABLE_TAG:-}" ]] || die "ghcr-dev requires AUTOUPDATE_GHCR_MUTABLE_TAG"
+      [[ "$AUTOUPDATE_GHCR_MUTABLE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]] \
+        || die "AUTOUPDATE_GHCR_MUTABLE_TAG is invalid"
       for index in "${!image_references[@]}"; do
         image="${image_references[$index]}"
         [[ "$image" == ghcr.io/* ]] || die "ghcr-dev allows only ghcr.io images: $image"
-        [[ "$image" == *:latest ]] || die "ghcr-dev allows only the exact mutable latest tag: $image"
+        [[ "${image##*:}" == "$AUTOUPDATE_GHCR_MUTABLE_TAG" ]] \
+          || die "ghcr-dev image must use explicitly configured mutable tag ${AUTOUPDATE_GHCR_MUTABLE_TAG}: $image"
       done
       ;;
     artifactory-repo-ops)

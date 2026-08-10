@@ -1,5 +1,5 @@
 [Unit]
-Description=Run Example app allowlisted Compose image auto-update every 30 minutes
+Description=Run Content viewer allowlisted Compose image auto-update every 30 minutes
 
 [Timer]
 OnCalendar=*:0/30

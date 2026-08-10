@@ -81,8 +81,8 @@ case "$1" in
       config)
         if [[ " $* " == *" --services "* ]]; then
           printf 'api\n'
-        elif [[ "${MOCK_RENDERED_IMAGE:-ghcr.io/example/example-app-api:latest}" ]]; then
-          printf '%s\n' "${MOCK_RENDERED_IMAGE:-ghcr.io/example/example-app-api:latest}"
+        elif [[ "${MOCK_RENDERED_IMAGE:-ghcr.io/example/example-app-api:dev}" ]]; then
+          printf '%s\n' "${MOCK_RENDERED_IMAGE:-ghcr.io/example/example-app-api:dev}"
         fi
         ;;
       ps) printf 'container-api\n' ;;
@@ -114,7 +114,7 @@ case "$1" in
           if grep -q '^compose-pull$' "$ACTION_LOG"; then
             active_digest_number="${MOCK_REMOTE_DIGEST_NUMBER:-2}"
           fi
-          repository="${MOCK_RENDERED_IMAGE:-ghcr.io/example/example-app-api:latest}"
+          repository="${MOCK_RENDERED_IMAGE:-ghcr.io/example/example-app-api:dev}"
           repository="${repository%:*}"
           printf '%s@' "$repository"
           digest "$active_digest_number"
@@ -139,9 +139,10 @@ AUTOUPDATE_COMPOSE_FILES="compose.yaml"
 AUTOUPDATE_COMPOSE_ENV_FILES="compose.env"
 AUTOUPDATE_ALLOWED_SERVICES="api"
 AUTOUPDATE_ALLOWED_IMAGES="
-api=ghcr.io/example/example-app-api:latest
+api=ghcr.io/example/example-app-api:dev
 "
 AUTOUPDATE_REGISTRY_PROFILE=ghcr-dev
+AUTOUPDATE_GHCR_MUTABLE_TAG=dev
 AUTOUPDATE_TARGET_PLATFORM=linux/amd64
 AUTOUPDATE_UP_COMMAND=./up.sh
 AUTOUPDATE_HEALTH_COMMAND=./healthcheck.sh
@@ -179,14 +180,45 @@ assert_contains "immutable digest pins" "${TEST_DIR}/output"
 pass "rejects immutable digest pins"
 
 make_fixture
-MOCK_RENDERED_IMAGE="ghcr.io/example/untrusted:latest" assert_status 1 run_template --once
+MOCK_RENDERED_IMAGE="ghcr.io/example/untrusted:dev" assert_status 1 run_template --once
 assert_contains "rendered image is not the allowlisted image" "${TEST_DIR}/output"
 pass "rejects unrecognized rendered images"
 
 make_fixture
 MOCK_LOCAL_DIGEST_NUMBER=2 assert_status 10 run_template --once
 assert_contains "status=noop reason=all-allowlisted-services-match-remote" "${TEST_DIR}/output"
-pass "logs and returns the documented no-op status"
+pass "accepts the explicitly configured dev tag and returns the documented no-op status"
+
+make_fixture
+cat >>"${TEST_DIR}/autoupdate.conf" <<'EOF'
+AUTOUPDATE_ALLOWED_IMAGES="
+api=ghcr.io/example/example-app-api:latest
+"
+EOF
+MOCK_RENDERED_IMAGE="ghcr.io/example/example-app-api:latest" assert_status 1 run_template --once
+assert_contains "must use explicitly configured mutable tag dev" "${TEST_DIR}/output"
+pass "rejects latest without an explicit latest allowlist"
+
+make_fixture
+cat >>"${TEST_DIR}/autoupdate.conf" <<'EOF'
+AUTOUPDATE_ALLOWED_IMAGES="
+api=ghcr.io/example/example-app-api:latest
+"
+AUTOUPDATE_GHCR_MUTABLE_TAG=latest
+EOF
+MOCK_RENDERED_IMAGE="ghcr.io/example/example-app-api:latest" MOCK_LOCAL_DIGEST_NUMBER=2 assert_status 10 run_template --once
+assert_contains "status=noop reason=all-allowlisted-services-match-remote" "${TEST_DIR}/output"
+pass "allows latest only after explicit configuration"
+
+make_fixture
+cat >>"${TEST_DIR}/autoupdate.conf" <<'EOF'
+AUTOUPDATE_ALLOWED_IMAGES="
+api=ghcr.io/example/example-app-api:candidate
+"
+EOF
+MOCK_RENDERED_IMAGE="ghcr.io/example/example-app-api:candidate" assert_status 1 run_template --once
+assert_contains "must use explicitly configured mutable tag dev" "${TEST_DIR}/output"
+pass "rejects an unallowlisted mutable tag"
 
 make_fixture
 cat >>"${TEST_DIR}/autoupdate.conf" <<EOF

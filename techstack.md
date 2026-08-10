@@ -106,7 +106,7 @@ single-operator option.
 
 | Profile | Publish source and gate | Runtime pull host | Mutable channel | Immutable release pins |
 | --- | --- | --- | --- | --- |
-| `ghcr-dev` | Protected GitHub publish with Trivy High/Critical gate | `ghcr.io` using host Docker credential store | Exact `ghcr.io/<namespace>/<image>:latest`, allowlisted app services only | `ghcr.io/...:tag@sha256:digest` through reviewed release-pin PR |
+| `ghcr-dev` | Protected GitHub publish with Trivy High/Critical gate | `ghcr.io` using host Docker credential store | Exact application-configured `ghcr.io/<namespace>/<image>:<mutable-tag>` (the content-viewer channel is `ghcr.io/mkronvold-wtg/content-viewer:dev`); `latest` only when explicitly allowlisted | `ghcr.io/...:tag@sha256:digest` through reviewed release-pin PR |
 | `artifactory-repo-ops` | Protected `sv4.art/repo.ops` publication after Trivy and Xray; record source-to-pull digest mapping | **`repo.ops` only**, with pull-only host credentials | Exact mutable `repo.ops/...:tag`, `linux/amd64`, mapped source digest, and matching OCI revision | `repo.ops/...:tag@sha256:digest` through reviewed release-pin PR |
 
 `sv4.art` is a protected publication/provenance endpoint, never a host runtime

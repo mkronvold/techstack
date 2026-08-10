@@ -43,7 +43,9 @@ It requires Bash 4+, Docker Compose v2 with Buildx, and Linux `flock`.
 
 `AUTOUPDATE_WORKDIR`, Compose files, Compose env files, service-to-image
 allowlist, registry profile, target platform, command paths, lock path, digest
-record path, and rollback image prefix are required. Compose and env paths are whitespace-free relative paths beneath
+record path, and rollback image prefix are required. `ghcr-dev` additionally
+requires `AUTOUPDATE_GHCR_MUTABLE_TAG`; it has no default and may be `latest`
+only when the application explicitly sets it. Compose and env paths are whitespace-free relative paths beneath
 `AUTOUPDATE_WORKDIR`. Commands are local `./` executable paths beneath the
 same working directory and do not take inline arguments; use small reviewed
 wrappers when arguments are needed.
@@ -84,7 +86,7 @@ environment values, or handles registry tokens.
 
 | Profile | Allowed runtime image refs | Additional enforcement |
 | --- | --- | --- |
-| `ghcr-dev` | Exact `ghcr.io/<namespace>/<image>:latest` only | Linux target; Docker credential store handles optional private GHCR pulls |
+| `ghcr-dev` | Exact `ghcr.io/<namespace>/<image>:${AUTOUPDATE_GHCR_MUTABLE_TAG}` only | Linux target; the application must explicitly configure its mutable tag (the canonical content-viewer example uses `:dev`); Docker credential store handles optional private GHCR pulls |
 | `artifactory-repo-ops` | Exact `repo.ops/<path>:<mutable-tag>` only | Exact `linux/amd64`, protected source-to-pull mapping, and matching OCI revision |
 
 For `artifactory-repo-ops`, `AUTOUPDATE_ARTIFACTORY_MAPPING_PATH` is required.

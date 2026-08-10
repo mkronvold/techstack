@@ -141,7 +141,7 @@ source image's protected scan gates pass.
 | --- | --- | --- |
 | `sha-*` / immutable digest | Exact build | Only via release-pin or explicit pin |
 | `vX.Y.Z` | Release publish | After release-pin PR merge |
-| `latest` | Candidate / mutable home channel | Home `autoupdate.sh` only if opted in |
+| Explicit app mutable tag (for example `dev`) | Candidate / mutable home channel | Home `autoupdate.sh` only when that tag is explicitly allowlisted; `latest` is not a default |
 | `refresh-*` | Diagnostic rebuild evidence | No production immutable channel |
 
 Publishing is **not** deploying. See [`lcm.md`](./lcm.md).
