@@ -14,6 +14,8 @@ CONFIG_PATH="${AUTOUPDATE_CONFIG:-${SCRIPT_DIR}/autoupdate.conf}"
 RUN_ONCE=false
 DRY_RUN=false
 INTERVAL_OVERRIDE=""
+ROLLBACK_ARMED=false
+ROLLBACK_IN_PROGRESS=false
 
 log() {
   local level="$1"
@@ -86,10 +88,56 @@ run_app_command() {
 
   (
     cd -- "$AUTOUPDATE_WORKDIR"
+    export DOCKER_DEFAULT_PLATFORM="$AUTOUPDATE_TARGET_PLATFORM"
     AUTOUPDATE_SERVICES="$services_csv" \
       AUTOUPDATE_ROLLBACK="$rollback_mode" \
       "$command" --services "$@"
   )
+}
+
+install_rollback_traps() {
+  ROLLBACK_ARMED=true
+  ROLLBACK_IN_PROGRESS=false
+  trap 'handle_interrupted_update HUP' HUP
+  trap 'handle_interrupted_update INT' INT
+  trap 'handle_interrupted_update TERM' TERM
+}
+
+clear_rollback_traps() {
+  ROLLBACK_ARMED=false
+  trap - HUP INT TERM
+}
+
+handle_interrupted_update() {
+  local signal="$1"
+  local exit_status
+  case "$signal" in
+    HUP) exit_status=129 ;;
+    INT) exit_status=130 ;;
+    TERM) exit_status=143 ;;
+    *) exit_status=1 ;;
+  esac
+
+  if [[ "$ROLLBACK_IN_PROGRESS" == true ]]; then
+    log error "status=interrupted signal=$signal reason=rollback-already-running"
+    exit "$exit_status"
+  fi
+
+  ROLLBACK_IN_PROGRESS=true
+  ROLLBACK_ARMED=false
+  # Ignore a repeated service-manager signal while the one bounded rollback runs.
+  trap '' HUP INT TERM
+  log warn "status=interrupted signal=$signal action=restore-prior-images"
+  if ! restore_prior_images; then
+    log error "status=rollback-failed signal=$signal"
+  fi
+  exit "$exit_status"
+}
+
+rollback_after_candidate_failure() {
+  ROLLBACK_ARMED=false
+  trap '' HUP INT TERM
+  restore_prior_images
 }
 
 contains_value() {
@@ -245,9 +293,9 @@ validate_tools() {
 }
 
 validate_rendered_services() {
-  local -a rendered_services rendered_images
+  local -a rendered_services rendered_images rendered_platforms
   mapfile -t rendered_services < <(run_compose config --services)
-  local service image expected_image
+  local service image expected_image rendered_platform
   for service in "${allowed_services[@]}"; do
     contains_value "$service" "${rendered_services[@]}" || die "allowlisted service is absent from rendered Compose config: $service"
     mapfile -t rendered_images < <(run_compose config --images "$service")
@@ -255,6 +303,11 @@ validate_rendered_services() {
     image="${rendered_images[0]}"
     expected_image="$(image_for_service "$service")"
     [[ "$image" == "$expected_image" ]] || die "rendered image is not the allowlisted image for $service"
+    mapfile -t rendered_platforms < <(run_compose config "$service" | awk '/^[[:space:]]*platform:[[:space:]]*/ { sub(/^[[:space:]]*platform:[[:space:]]*/, ""); gsub(/["[:space:]]/, ""); print }')
+    for rendered_platform in "${rendered_platforms[@]}"; do
+      [[ "$rendered_platform" == "$AUTOUPDATE_TARGET_PLATFORM" ]] \
+        || die "rendered service platform conflicts with AUTOUPDATE_TARGET_PLATFORM for $service: $rendered_platform"
+    done
   done
 }
 
@@ -468,23 +521,25 @@ run_cycle() {
 
   run_id="$(date -u +'%Y%m%dT%H%M%SZ')"
   capture_prior_images
+  install_rollback_traps
   if ! run_compose pull "${changed_services[@]}"; then
-    restore_prior_images
+    rollback_after_candidate_failure
     die "pull failed; prior image tags were restored"
   fi
   if ! verify_pulled_digests; then
-    restore_prior_images
+    rollback_after_candidate_failure
     die "pulled images did not match inspected remote manifests; prior images were restored"
   fi
   if ! run_app_command "$AUTOUPDATE_UP_COMMAND" 0 "${changed_services[@]}"; then
-    restore_prior_images
+    rollback_after_candidate_failure
     die "up command failed; prior images were restored"
   fi
   if ! run_app_command "$AUTOUPDATE_HEALTH_COMMAND" 0 "${changed_services[@]}"; then
-    restore_prior_images
+    rollback_after_candidate_failure
     die "health command failed; prior images were restored"
   fi
   record_deployment
+  clear_rollback_traps
   log info "status=updated services=$(IFS=,; printf '%s' "${changed_services[*]}")"
 }
 
@@ -572,4 +627,6 @@ main() {
   done
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

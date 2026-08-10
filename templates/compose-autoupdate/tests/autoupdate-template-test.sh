@@ -4,6 +4,8 @@ set -Eeuo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
 TEMPLATE="${ROOT}/templates/compose-autoupdate/autoupdate.sh"
+SERVICE_TEMPLATE="${ROOT}/templates/compose-autoupdate/systemd/autoupdate.service"
+TEMPLATE_README="${ROOT}/templates/compose-autoupdate/README.md"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf -- "$TMP_ROOT"' EXIT
 
@@ -51,7 +53,7 @@ make_fixture() {
   cat >"${APP_DIR}/up.sh" <<'SCRIPT'
 #!/usr/bin/env bash
 set -Eeuo pipefail
-printf 'up rollback=%s services=%s\n' "${AUTOUPDATE_ROLLBACK:-0}" "${AUTOUPDATE_SERVICES:-}" >>"$ACTION_LOG"
+printf 'up rollback=%s services=%s platform=%s\n' "${AUTOUPDATE_ROLLBACK:-0}" "${AUTOUPDATE_SERVICES:-}" "${DOCKER_DEFAULT_PLATFORM:-}" >>"$ACTION_LOG"
 SCRIPT
   cat >"${APP_DIR}/healthcheck.sh" <<'SCRIPT'
 #!/usr/bin/env bash
@@ -81,8 +83,13 @@ case "$1" in
       config)
         if [[ " $* " == *" --services "* ]]; then
           printf 'api\n'
-        elif [[ "${MOCK_RENDERED_IMAGE:-ghcr.io/example/example-app-api:dev}" ]]; then
+        elif [[ " $* " == *" --images "* ]]; then
           printf '%s\n' "${MOCK_RENDERED_IMAGE:-ghcr.io/example/example-app-api:dev}"
+        else
+          printf 'services:\n  api:\n'
+          if [[ -n "${MOCK_RENDERED_PLATFORM:-}" ]]; then
+            printf '    platform: %s\n' "$MOCK_RENDERED_PLATFORM"
+          fi
         fi
         ;;
       ps) printf 'container-api\n' ;;
@@ -185,6 +192,11 @@ assert_contains "rendered image is not the allowlisted image" "${TEST_DIR}/outpu
 pass "rejects unrecognized rendered images"
 
 make_fixture
+MOCK_RENDERED_PLATFORM=linux/arm64 assert_status 1 run_template --once
+assert_contains "rendered service platform conflicts with AUTOUPDATE_TARGET_PLATFORM" "${TEST_DIR}/output"
+pass "rejects a rendered Compose platform conflict"
+
+make_fixture
 MOCK_LOCAL_DIGEST_NUMBER=2 assert_status 10 run_template --once
 assert_contains "status=noop reason=all-allowlisted-services-match-remote" "${TEST_DIR}/output"
 pass "accepts the explicitly configured dev tag and returns the documented no-op status"
@@ -254,13 +266,42 @@ pass "dry run performs no pull, restart, or tag"
 
 make_fixture
 MOCK_HEALTH_FAIL=1 assert_status 1 run_template --once
+assert_contains "up rollback=0 services=api platform=linux/amd64" "$ACTION_LOG"
 assert_contains "up rollback=1 services=api" "$ACTION_LOG"
 assert_contains "image-tag" "$ACTION_LOG"
 pass "health failure restores prior image tags and invokes rollback"
 
 make_fixture
+set +e
+PATH="${BIN_DIR}:${PATH}" ACTION_LOG="$ACTION_LOG" bash -c '
+  source "$1"
+  source "$2"
+  changed_services=(api)
+  changed_images=(ghcr.io/example/example-app-api:dev)
+  changed_image_ids=(image-api)
+  changed_current_digests=(sha256:0000000000000000000000000000000000000000000000000000000000000001)
+  changed_remote_digests=(sha256:0000000000000000000000000000000000000000000000000000000000000002)
+  rollback_tags=(autoupdate-rollback/example/api:prior)
+  install_rollback_traps
+  handle_interrupted_update TERM
+' bash "$TEMPLATE" "${TEST_DIR}/autoupdate.conf" >"${TEST_DIR}/output" 2>&1
+signal_status=$?
+set -e
+[[ "$signal_status" == 143 ]] || fail "expected signal rollback exit 143, got $signal_status"
+assert_contains "status=interrupted signal=TERM action=restore-prior-images" "${TEST_DIR}/output"
+assert_contains "up rollback=1 services=api platform=linux/amd64" "$ACTION_LOG"
+assert_contains "image-tag" "$ACTION_LOG"
+pass "TERM rollback restores prior tags through the configured rollback path"
+
+make_fixture
 MOCK_FLOCK_EXIT=1 assert_status 75 run_template --once
 assert_contains "reason=concurrent-run" "${TEST_DIR}/output"
 pass "rejects concurrent runs"
+
+assert_contains "SuccessExitStatus=10" "$SERVICE_TEMPLATE"
+assert_contains "TimeoutStopSec=2min" "$SERVICE_TEMPLATE"
+assert_contains "loginctl enable-linger" "$TEMPLATE_README"
+assert_contains "trap 'handle_interrupted_update TERM' TERM" "$TEMPLATE"
+pass "documents durable user timer operation and no-op service success"
 
 printf '1..%s\n' "$PASS_COUNT"

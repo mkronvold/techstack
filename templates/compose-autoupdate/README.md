@@ -25,7 +25,18 @@ It requires Bash 4+, Docker Compose v2 with Buildx, and Linux `flock`.
 3. Run `./autoupdate.sh --config /path/to/autoupdate.conf --dry-run`, then
    `--once`. The script returns `10` for a logged no-op and `75` if another
    run owns the lock.
-4. Substitute the absolute application paths in
+4. Enable lingering for the deployment user before enabling a user timer. This
+   is required for unattended runs to survive logout and boot:
+
+   ```bash
+   deployment_user=<deployment-user>
+   sudo loginctl enable-linger "$deployment_user"
+   test "$(loginctl show-user "$deployment_user" -p Linger --value)" = yes
+   ```
+
+   Use the equivalent host-approved user-session persistence mechanism only if
+   `loginctl` is unavailable.
+5. Substitute the absolute application paths in
    [`systemd/autoupdate.service`](./systemd/autoupdate.service) and enable the
    copied user timer:
 
@@ -61,6 +72,7 @@ not appear in this configuration.
 ```text
 --services api web
 AUTOUPDATE_SERVICES=api,web
+DOCKER_DEFAULT_PLATFORM=linux/amd64
 ```
 
 For a normal update, `up.sh` may perform the application's existing safe
@@ -68,6 +80,9 @@ startup work only for those services. For `AUTOUPDATE_ROLLBACK=1`, it must not
 pull; it must recreate only the requested services from the local tags the
 template restored. This is how a failed post-update health check returns to the
 previous running image without touching a database, proxy, or sidecar.
+The updater exports `DOCKER_DEFAULT_PLATFORM` to every app command and rejects
+an explicit rendered Compose `platform:` that conflicts with the configured
+target.
 
 Before pulling, the updater records each running image ID under a local
 rollback tag. It compares the running manifest digest with the manifest digest
@@ -76,11 +91,21 @@ are pulled. It verifies the pulled digest, invokes `up.sh`, runs health, writes
 the digest record atomically, and restores the prior tags plus the app rollback
 path when either command fails.
 
+Once prior image tags are retained, the updater arms bounded `TERM`, `INT`, and
+`HUP` handling. An interruption ignores repeated signals, restores prior tags,
+and invokes the same allowlisted rollback/health path before exiting with the
+signal status. This prevents an interrupted mutable candidate from becoming a
+later no-op baseline. The supplied service bounds this recovery with
+`TimeoutStopSec=2min`; set a deliberate equivalent limit when adapting it.
+
 The script uses `flock -n`. It fails closed on missing runtime services,
 unrecognized rendered images, immutable `@sha256` pins, missing manifest
 digests, registry/auth/manifest failures, invalid configuration, or a
 concurrent invocation. It never runs `docker login`, prints configuration or
 environment values, or handles registry tokens.
+
+The supplied user service treats no-op exit `10` as successful
+(`SuccessExitStatus=10`).
 
 ## Registry profiles
 

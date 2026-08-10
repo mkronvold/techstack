@@ -5,6 +5,8 @@ After=network-online.target
 
 [Service]
 Type=oneshot
+SuccessExitStatus=10
+TimeoutStopSec=2min
 WorkingDirectory=/srv/content-viewer/infra/docker
 Environment=HOME=%h
 ExecStart=/srv/content-viewer/infra/docker/autoupdate.sh --config %h/.config/content-viewer/autoupdate.conf --once
