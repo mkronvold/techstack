@@ -42,7 +42,7 @@ Apply unless the app section explicitly waives an item.
 | Immutable channel | Compose pins + raw Kubernetes + `v*` release-pin PR |
 | Home autoupdate | Optional only; never replaces immutable pins |
 | Themes (UI apps) | Depend on published `@mkronvold/themes` via lockfile |
-| WTG registry | Artifactory `sv4.art/repo.ops` primary + Xray gate + `.xrayignore` + human exceptions |
+| WTG registry | Protected `sv4.art/repo.ops` publication, `repo.ops` runtime pulls only, Xray gate + `.xrayignore` + human exceptions |
 | Home registry | GHCR primary; declare profile in docs |
 
 **Universal session add-on (append to any kickoff):**
@@ -248,8 +248,8 @@ Keep: pnpm+Turbo workspace, NestJS/Fastify API, worker, Zod schemas, release-pin
 PR, Kubernetes digests, fail-closed Trivy.
 
 Priority order:
-1. Artifactory sv4.art/repo.ops primary publish (+ optional GHCR mirror); release
-   pins reference primary registry.
+1. Protected Artifactory `sv4.art/repo.ops` publication and `repo.ops` runtime
+   distribution (+ optional GHCR mirror); release pins reference `repo.ops`.
 2. Xray policy gate on published digest; .xrayignore + security/exceptions.md.
 3. Lane B base-image CVE digest PR bot + crit/high automerge (from revu), with
    bot token so checks run.
@@ -363,4 +363,3 @@ Use these IDs in commits/PRs when useful; details and kickoffs are in the app se
 Do **not** keep a second full copy under `~/.promptlib`. Entry point:
 
 - `~/.promptlib/techstack.md` — links to this file and sibling policy docs only
-

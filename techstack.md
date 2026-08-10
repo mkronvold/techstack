@@ -6,6 +6,7 @@ Decision matrix for application shape and core tooling. Operational CI, scanning
 - [`lcm.md`](./lcm.md) — refresh, deploy channels, workload impact
 - [`scanning.md`](./scanning.md) — Dependabot, Trivy, Xray, exceptions
 - [`repo-setup.md`](./repo-setup.md) — repository settings and layout checklist
+- [`templates/compose-autoupdate/`](./templates/compose-autoupdate/) — canonical vendored Compose mutable-channel template
 
 ## Select the application profile
 
@@ -96,6 +97,22 @@ Until `@mkronvold/themes` is published non-private, treat that as a baseline blo
 | Alpine/distroless proposed | Only after build, test, scan, and ops work without shims | Do not choose solely for size |
 | Local multi-service dev | Docker Compose | Health checks and volumes; keep prod Compose app-specific |
 | Multiple deployed services | One container per service | Separate web, API, worker, DB, migrate/init |
+
+## Registry and deployment profile matrix
+
+Use one profile per runtime path. The required immutable release-pin path is
+always present; mutable Compose auto-update is a separately enabled,
+single-operator option.
+
+| Profile | Publish source and gate | Runtime pull host | Mutable channel | Immutable release pins |
+| --- | --- | --- | --- | --- |
+| `ghcr-dev` | Protected GitHub publish with Trivy High/Critical gate | `ghcr.io` using host Docker credential store | Exact application-configured `ghcr.io/<namespace>/<image>:<mutable-tag>` (the content-viewer channel is `ghcr.io/mkronvold-wtg/content-viewer:dev`); `latest` only when explicitly allowlisted | `ghcr.io/...:tag@sha256:digest` through reviewed release-pin PR |
+| `artifactory-repo-ops` | Protected `sv4.art/repo.ops` publication after Trivy and Xray; record source-to-pull digest mapping | **`repo.ops` only**, with pull-only host credentials | Exact mutable `repo.ops/...:tag`, `linux/amd64`, mapped source digest, and matching OCI revision | `repo.ops/...:tag@sha256:digest` through reviewed release-pin PR |
+
+`sv4.art` is a protected publication/provenance endpoint, never a host runtime
+pull endpoint. The canonical auto-update template rejects it in runtime image
+references. Neither profile permits an auto-updater to touch a database,
+proxy, migration job, cache, or sidecar.
 
 ## Version alignment
 
