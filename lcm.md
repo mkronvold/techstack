@@ -71,7 +71,7 @@ Trusted self-hosted Docker Compose instances **may** track a mutable app tag (us
 | Location | Beside `up.sh` / `down.sh` and the production Compose file |
 | Modes | Long-running interval **and** `--once` for cron/systemd |
 | Detection | Resolve images from `docker compose config`; compare local digest to remote manifest (`Docker-Content-Digest` or registry API) |
-| Registry | Match the app’s primary profile (GHCR home; Artifactory when that is what the host runs) |
+| Registry | Match the app’s profile (`ghcr.io` for `ghcr-dev`; `repo.ops` only for Artifactory runtime pulls) |
 | Scope | **Only** app images (`api` / `web` / `worker`). Never auto-refresh Postgres, proxies, or data-plane sidecars on the app cadence |
 | Apply | `docker compose pull <changed>` then restart **only** through `./up.sh` |
 | Startup path | Migrations, env reconcile, bootstrap live in `up.sh`; auto-refresh must reuse them |
@@ -82,6 +82,42 @@ Trusted self-hosted Docker Compose instances **may** track a mutable app tag (us
 | Scheduling | Prefer `--once` every ~30 minutes per stack instance; one timer/log/lock per stack |
 
 Do **not** use Watchtower unless an explicit exception is recorded.
+
+### Canonical reusable template contract
+
+Use the versioned, vendored
+[`templates/compose-autoupdate/`](./templates/compose-autoupdate/) template as
+the starting point. An app copies it under its reviewed `infra/docker/` tree
+and brings later changes in through a sync PR; a host never downloads script
+or application code at update time.
+
+| Contract | Acceptance criterion |
+| --- | --- |
+| Required configuration | Working directory, Compose files, Compose env files, explicit service-to-image allowlist, registry profile, target platform, app `up.sh`/health/rollback commands, lock path, digest record path, and rollback image prefix are set and validated before Docker is called |
+| Safety scope | The rendered Compose image for every allowed service matches its allowlist entry; only those services are passed to `docker compose pull` and app commands; DBs, proxies, migration jobs, caches, and sidecars are never listed or operated |
+| Remote comparison | The running image's registry manifest digest is compared to the remote tag digest; Docker resolves the configured target platform, while the Artifactory profile independently verifies its Linux/amd64 child manifest; registry/auth/manifest errors and missing digests fail closed |
+| Modes and locking | `--once`, `--dry-run`, and optional interval operation exist; `flock -n` rejects a concurrent run; a confirmed no-op is logged and exits `10` |
+| Apply and health | Changed services only are pulled, then restarted through the app's `up.sh --services ...`; health runs after restart; `--dry-run` makes no pull, restart, tag, or record mutation |
+| Rollback | Before pull, retain every currently running image under a local rollback tag; on pull, start, or health failure restore those tags and invoke the app rollback path for only the changed services |
+| Credentials and observability | Use Docker's configured credential store; never run `docker login`, echo configuration, or print tokens; atomically record before/after/remote digests after a healthy update |
+| Tests | Portable shell tests use fake Docker and flock commands and cover configuration/argument errors, immutable pins, allowlist mismatch, no-op, dry-run, rollback, and concurrent-run rejection without a daemon or network |
+
+`up.sh` and the configured health/rollback executables must accept
+`--services <service>...` and `AUTOUPDATE_SERVICES`. During
+`AUTOUPDATE_ROLLBACK=1`, `up.sh` must skip pulling and recreate only those
+services from the local tags restored by the updater.
+
+### Mutable development versus immutable release pins
+
+The updater is for an explicitly enabled mutable development/home candidate
+tag; it cannot rewrite, consume, or replace immutable `tag@sha256:digest`
+release pins. `ghcr-dev` accepts only
+`ghcr.io/<namespace>/<image>:latest`. `artifactory-repo-ops` accepts only
+`repo.ops` runtime image references and requires a protected
+source-to-pull digest mapping, `linux/amd64`, and matching
+`org.opencontainers.image.revision`; `sv4.art` is publication provenance,
+never a runtime pull endpoint. Required release-pin Compose and Kubernetes
+deployments continue to use immutable digests and reviewed promotion PRs.
 
 ### Companion scripts
 

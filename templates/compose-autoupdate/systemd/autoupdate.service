@@ -1,0 +1,15 @@
+[Unit]
+Description=Example app allowlisted Compose image auto-update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/example-app/infra/docker
+Environment=HOME=%h
+ExecStart=/srv/example-app/infra/docker/autoupdate.sh --config %h/.config/example-app/autoupdate.conf --once
+
+# Keep Docker credential-store access and state isolated to this user.
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077

@@ -89,22 +89,43 @@ Choose **one primary** profile per deployment audience. Pipelines stay the same;
 
 | Item | Value |
 | --- | --- |
-| Primary registry | Artifactory Docker repo `sv4.art/repo.ops` (confirm exact repository path per org standards) |
-| Image name | `sv4.art/repo.ops/<app>-<service>` (or org-standard path) |
+| Protected publication source | Artifactory Docker repo `sv4.art/repo.ops` (confirm exact repository path per org standards) |
+| Runtime pull registry | `repo.ops` only; never `sv4.art` |
+| Runtime image name | `repo.ops/<app>-<service>` (or org-standard path) |
 | Optional mirror | Also push the same tags/digests to GHCR when useful for home or backup pulls |
 | Auth (CI) | Artifactory identity token / robot user via Actions secrets; never in git |
-| Auth (runtime) | Cluster pull secrets / host docker config for Artifactory |
+| Auth (runtime) | Pull-only cluster secret / host Docker credential-store identity for `repo.ops`; never a `sv4.art` runtime identity |
 | Xray gate | **Required** on the published Artifactory digest — see [`scanning.md`](./scanning.md) |
 | Typical consumers | Org Kubernetes and org Docker hosts |
+
+### Runtime-pull boundary for Artifactory
+
+`sv4.art/repo.ops` is the protected **publication** source. A successful
+protected publish must complete Trivy, the required Xray policy gate, SBOM and
+provenance capture, and OCI label verification before promotion. The promotion
+step records a source-to-pull mapping containing:
+
+```text
+repo.ops/<path>:<mutable-tag>|sha256:<repo-ops-manifest>|sv4.art/repo.ops/<path>@sha256:<source-manifest>|sha256:<source-manifest>|linux/amd64|<org.opencontainers.image.revision>
+```
+
+Org runtime hosts and the canonical auto-update template pull **only**
+`repo.ops/<path>`, use a Docker credential-store identity limited to pull, and
+must never use `sv4.art` as a runtime pull host. The updater checks the
+`repo.ops` manifest digest, the trusted mapping, `linux/amd64`, and the
+`org.opencontainers.image.revision` label before it pulls. Treat the mapping
+as protected deployment metadata: publish or provision it only after the
+source image's protected scan gates pass.
 
 ### Dual-push shape (when mirror enabled)
 
 1. Build once.
-2. Tag for primary registry (and optional GHCR).
-3. Push primary; record digest.
-4. Push mirror with the same digest/tags when configured.
-5. Scan the digest that will actually run (at minimum the primary).
-6. Release-pin PRs reference the **primary** registry string for that app’s deploy profile.
+2. Push to protected `sv4.art/repo.ops`; record the immutable source digest.
+3. Run Trivy, Xray, SBOM/provenance, and OCI revision checks.
+4. Promote to `repo.ops`, recording the source-to-pull digest mapping for
+   `linux/amd64`; optionally mirror the same artifact to GHCR.
+5. Release-pin PRs reference the **runtime** `repo.ops` registry string for
+   the Artifactory profile, never the protected source host.
 
 ### Profile decision
 
