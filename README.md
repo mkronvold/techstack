@@ -9,6 +9,7 @@ Use this repository when starting or remediate-standardizing an app so tooling, 
 | Doc | Covers |
 | --- | --- |
 | [`techstack.md`](./techstack.md) | Application profiles, tooling decision matrix, repo layout, Node/package defaults, themes package consumption |
+| [`image-policy.md`](./image-policy.md) | Upstream-first image terminology, derived application-image standard, controls, exceptions, and TSX/Node/Postgres patterns |
 | [`ci.md`](./ci.md) | Required validation, image build/publish, themes at build time, registry profiles (GHCR vs Artifactory), evidence |
 | [`lcm.md`](./lcm.md) | Image refresh cadence, immutable release pins, optional home auto-update, workload impact and how to avoid churn |
 | [`templates/compose-autoupdate/`](./templates/compose-autoupdate/) | Vendored canonical Compose auto-update script, configuration, systemd user timer, and portable safety tests |
