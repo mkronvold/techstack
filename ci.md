@@ -36,6 +36,7 @@ Docs-only standard: copy/adapt from reference repos; do not call reusable workfl
 | `refresh-images` | Weekly schedule + manual | Same validate/build/scan/publish for candidate `latest` / `refresh-*` tags; **do not** mutate `sha-*` tags |
 | `trivy-scan` or scan steps inside publish | PR + default branch + after refresh | Per-service Trivy; SARIF categories; fail High/Critical subject to exceptions — see [`scanning.md`](./scanning.md) |
 | `automerge-dependencies` | Dependabot PR events | Auto-approve/merge eligible patch/minor only |
+| `update-behind-prs` | PR events + hourly schedule + manual | Update eligible PR branches that are behind the base branch without running PR code |
 | `base-image-cve-fix` + `automerge-base-image-cve` | After successful publish/refresh, schedule, manual | **Required** Lane B digest PRs — see [`scanning.md`](./scanning.md) |
 | Release-pin job | On `v*` publish success | Open PR updating Compose **and** raw Kubernetes image refs to `tag@sha256:digest` |
 
@@ -45,6 +46,24 @@ Docs-only standard: copy/adapt from reference repos; do not call reusable workfl
 | --- | --- |
 | Validate + GHCR publish + inline Trivy/SBOM + Lane B | [`mkronvold/revu`](https://github.com/mkronvold/revu) `.github/workflows/` |
 | pnpm validate, path filters, provenance, CycloneDX artifacts, release-pin PR, fail-closed Trivy | [`mkronvold-wtg/tavi`](https://github.com/mkronvold-wtg/tavi) `.github/workflows/` |
+
+### Updating behind pull request branches
+
+Use an `update-behind-prs` workflow to keep safe-to-update PRs current with
+their base branch. Run it on `pull_request_target` events, an hourly schedule,
+and `workflow_dispatch`. The job must not check out or execute code from the
+pull request.
+
+Grant the job `pull-requests: write` and `contents: write`. Before calling
+`PUT /repos/{owner}/{repo}/pulls/{pull_number}/update-branch`, fetch the PR's
+current head SHA and send it as `expected_head_sha`. This prevents the updater
+from overwriting concurrent branch work.
+
+Limit automatic updates to bot-authored PRs and PRs explicitly labeled
+`auto-update-branch`. Only update PRs whose merge state is `BEHIND`. Log and
+report a failed update instead of attempting to resolve conflicts
+automatically. A targeted manual dispatch should accept a PR number for
+operator verification or recovery.
 
 ## Image build rules
 
